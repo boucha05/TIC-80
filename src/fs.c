@@ -201,6 +201,20 @@ static lua_State* netLuaInit(u8* buffer, s32 size)
     return NULL;
 }
 
+typedef struct
+{
+    char    hash[FILENAME_MAX];
+    char    name[FILENAME_MAX];
+    s32     id;
+} NetFileInfo;
+
+static int onFileInfoCompare(const void* a, const void* b)
+{
+    const NetFileInfo* fileInfo1 = *(const NetFileInfo**)a;
+    const NetFileInfo* fileInfo2 = *(const NetFileInfo**)b;
+    return fileInfo2->id - fileInfo1->id;
+}
+
 static void onDirResponse(u8* buffer, s32 size, void* data)
 {
 	NetDirData* netDirData = (NetDirData*)data;
@@ -242,17 +256,20 @@ static void onDirResponse(u8* buffer, s32 size, void* data)
 			{
 				s32 count = (s32)lua_rawlen(lua, -1);
 
+                NetFileInfo* fileInfoTable = (NetFileInfo*)calloc(count, sizeof(NetFileInfo));
+                NetFileInfo** fileInfoRefs = (NetFileInfo**)calloc(count, sizeof(NetFileInfo*));
+                s32 fileCount = 0;
+
 				for(s32 i = 1; i <= count; i++)
 				{
 					lua_geti(lua, -1, i);
 
-					char hash[FILENAME_MAX] = {0};
-					char name[FILENAME_MAX] = {0};
+                    NetFileInfo* fileInfo = fileInfoRefs[fileCount] = &fileInfoTable[fileCount];
 
 					{
 						lua_getfield(lua, -1, "hash");
 						if(lua_isstring(lua, -1))
-							strcpy(hash, lua_tostring(lua, -1));
+							strcpy(fileInfo->hash, lua_tostring(lua, -1));
 
 						lua_pop(lua, 1);
 					}
@@ -261,7 +278,7 @@ static void onDirResponse(u8* buffer, s32 size, void* data)
 						lua_getfield(lua, -1, "name");
 
 						if(lua_isstring(lua, -1))
-							strcpy(name, lua_tostring(lua, -1));
+							strcpy(fileInfo->name, lua_tostring(lua, -1));
 
 						lua_pop(lua, 1);
 					}
@@ -269,14 +286,27 @@ static void onDirResponse(u8* buffer, s32 size, void* data)
 					{
 						lua_getfield(lua, -1, "id");
 
-						if(lua_isinteger(lua, -1))
-							netDirData->callback(name, hash, lua_tointeger(lua, -1), netDirData->data, false);
+                        if (lua_isinteger(lua, -1))
+                        {
+                            fileInfo->id = lua_tointeger(lua, -1);
+                            ++fileCount;
+                        }
 
 						lua_pop(lua, 1);
 					}
 
 					lua_pop(lua, 1);
 				}
+
+                qsort(fileInfoRefs, fileCount, sizeof(NetFileInfo*), &onFileInfoCompare);
+                for (s32 i = 0; i < fileCount; ++i)
+                {
+                    NetFileInfo* fileInfo = fileInfoRefs[i];
+                    netDirData->callback(fileInfo->name, fileInfo->hash, fileInfo->id, netDirData->data, false);
+                }
+
+                free(fileInfoTable);
+                free(fileInfoRefs);
 			}
 
 			lua_pop(lua, 1);
