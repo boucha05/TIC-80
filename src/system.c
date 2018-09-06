@@ -727,21 +727,54 @@ static void processTouchInput()
 #endif
 }
 
+struct AltKey
+{
+    SDL_Keycode keycode;
+    u32 key;
+};
+
 static void handleKeydown(SDL_Keycode keycode, bool down)
 {
-	static const u32 KeyboardCodes[tic_keys_count] = 
-	{
-		#include "keycodes.inl"
-	};
+    static const u32 KeyboardCodes[tic_keys_count] =
+    {
+#include "keycodes.inl"
+    };
 
-	for(tic_key i = 0; i < COUNT_OF(KeyboardCodes); i++)
-	{
-		if(KeyboardCodes[i] == keycode)
-		{
-			platform.keyboard.state[i] = down;
-			break;
-		}
-	}
+    for (tic_key i = 0; i < COUNT_OF(KeyboardCodes); i++)
+    {
+        if (KeyboardCodes[i] == keycode)
+        {
+            platform.keyboard.state[i] = down;
+            break;
+        }
+    }
+
+    static const struct AltKey altKeys[] =
+    {
+        { SDLK_RCTRL, tic_key_ctrl },
+        { SDLK_RSHIFT, tic_key_shift },
+        { SDLK_RALT, tic_key_alt },
+        { SDLK_KP_ENTER, tic_key_return },
+        { SDLK_KP_1, tic_key_end },
+        { SDLK_KP_2, tic_key_down },
+        { SDLK_KP_3, tic_key_pagedown },
+        { SDLK_KP_4, tic_key_left },
+        { SDLK_KP_5, tic_key_unknown },
+        { SDLK_KP_6, tic_key_right },
+        { SDLK_KP_7, tic_key_home },
+        { SDLK_KP_8, tic_key_up },
+        { SDLK_KP_9, tic_key_pageup },
+        { SDLK_KP_0, tic_key_insert },
+        { SDLK_KP_PERIOD, tic_key_delete },
+    };
+    for (u32 i = 0; i < COUNT_OF(KeyboardCodes); i++)
+    {
+        if (altKeys[i].keycode == keycode)
+        {
+            platform.keyboard.state[altKeys[i].key] = down;
+            break;
+        }
+    }
 
 	if(keycode == SDLK_AC_BACK)
 		platform.keyboard.state[tic_key_escape] = down;
